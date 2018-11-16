@@ -85,4 +85,3 @@ if __name__ == '__main__':
         sess.run(init)
         out = sess.run(cnn.forward(X), feed_dict={X: data})
     print(out.shape)
-    print(out.transpose([0,2,1]))
