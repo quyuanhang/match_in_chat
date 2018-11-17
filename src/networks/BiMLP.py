@@ -6,11 +6,11 @@ class BiMLP:
         self.emb_dim = emb_dim
         self.bilinear_weights = tf.Variable(tf.random_normal(
             shape=[emb_dim, 2*emb_dim, 2*emb_dim]
-        ))
+        ), name='biW')
         self.mlp_weight = tf.Variable(tf.random_normal(
             shape=[emb_dim, 1]
-        ))
-        self.mlp_bias = tf.Variable(tf.random_normal(shape=[1]))
+        ), name='mlpW')
+        self.mlp_bias = tf.Variable(tf.random_normal(shape=[1]), name='mlpb')
 
     def forward(self, jd_data, cv_data):
         x = tf.map_fn(

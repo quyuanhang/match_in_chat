@@ -5,12 +5,12 @@ class CNN:
     def __init__(self, emb_dim, sent_len):
         self.sent_len = sent_len
         self.weights = {
-            'wc1': tf.Variable(tf.random_normal([5, emb_dim, 1, emb_dim])),
-            'wc2': tf.Variable(tf.random_normal([3, emb_dim, 1, emb_dim]))
+            'wc1': tf.Variable(tf.random_normal([5, emb_dim, 1, emb_dim]), name='cnn_w1'),
+            'wc2': tf.Variable(tf.random_normal([3, emb_dim, 1, emb_dim]), name='cnn_w2')
         }
         self.bias = {
-            'bc1': tf.Variable(tf.random_normal([emb_dim])),
-            'bc2': tf.Variable(tf.random_normal([emb_dim]))
+            'bc1': tf.Variable(tf.random_normal([emb_dim]), name='cnn_b1'),
+            'bc2': tf.Variable(tf.random_normal([emb_dim]), name='cnn_b2')
         }
 
     @staticmethod
@@ -58,9 +58,9 @@ class textCNN:
         self.emb_dim = emb_dim
         self.cnn = CNN(emb_dim, sent_len)
         if len(emb_weights) == 0:
-            self.emb_weights = tf.Variable(tf.random_normal([n_word, emb_dim]))
+            self.emb_weights = tf.Variable(tf.random_normal([n_word, emb_dim]), name='emb_w')
         else:
-            self.emb_weights = tf.Variable(emb_weights)
+            self.emb_weights = tf.Variable(emb_weights, name='emb_w')
 
     def forward(self, x):
         '''
