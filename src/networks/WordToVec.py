@@ -40,7 +40,7 @@ class InputData:
         for line in self.input_file:
             self.sentence_count += 1
             # line = line.strip().split(' ')
-            line = re.split('*[\t 。]]')
+            line = re.split('[\t 。]+', line)
             self.sentence_length += len(line)
             for w in line:
                 try:
@@ -189,12 +189,11 @@ class SkipGramModel(nn.Module):
         else:
             embedding = self.u_embeddings.weight.data.numpy()
         fout = open(file_name, 'w')
-        fout.write('%d %d\n' % (len(id2word), self.emb_dimension))
+        # fout.write('%d %d\n' % (len(id2word), self.emb_dimension))
         for wid, w in id2word.items():
             e = embedding[wid]
             e = ' '.join(map(lambda x: str(x), e))
             fout.write('%s %s\n' % (w, e))
-        # json.dump(id2word, fout)
 
 
 class Word2Vec:
@@ -236,6 +235,8 @@ class Word2Vec:
             self.skip_gram_model.cuda()
         self.optimizer = optim.SGD(
             self.skip_gram_model.parameters(), lr=self.initial_lr)
+        with open('{}.json'.format(self.output_file_name), 'w') as f:
+            json.dump(self.data.word2id, f, ensure_ascii=False, indent=2)
 
     def train(self):
         """Multiple training.
@@ -278,15 +279,16 @@ class Word2Vec:
         self.skip_gram_model.save_embedding(
             self.data.id2word, self.output_file_name, self.use_cuda)
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Run MLP.")
-    parser.add_argument('--datain', nargs='?', default='ml-1m')
+    parser.add_argument('--datain', default='interview')
     parser.add_argument('--dataout', default='interview')
     parser.add_argument('--t', type=int, default=5)
-    parser.add_argument('--emb_dimension', type=int, default=64)
-    parser.add_argument('--batch_size', type=int, default=50)
+    parser.add_argument('--emb_dimension', type=int, default=100)
+    parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--window_size', type=int, default=5)
-    parser.add_argument('--iteration', type=int, default=1)
+    parser.add_argument('--iteration', type=int, default=3)
     parser.add_argument('--initial_lr', type=int, default=0.025)
     parser.add_argument('--min_count', type=int, default=5)
     return parser.parse_args()
