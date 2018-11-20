@@ -40,7 +40,7 @@ class InputData:
         for line in self.input_file:
             self.sentence_count += 1
             # line = line.strip().split(' ')
-            line = re.split('[\t 。]+', line)
+            line = re.split('[\001\n\t ]+', line.strip())
             self.sentence_length += len(line)
             for w in line:
                 try:

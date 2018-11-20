@@ -21,7 +21,7 @@ class BiMLP:
         x = tf.sigmoid(x)
         x = tf.matmul(x, self.mlp_weight)
         x = tf.add(x, self.mlp_bias)
-        x = tf.sigmoid(x)
+        x = tf.sigmoid(x, name='predict')
         return x
 
     def bilinear(self, jd_data, cv_data, weights):

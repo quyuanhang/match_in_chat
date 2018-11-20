@@ -58,9 +58,9 @@ class textCNN:
         self.emb_dim = emb_dim
         self.cnn = CNN(emb_dim, sent_len)
         if len(emb_weights) == 0:
-            self.emb_weights = tf.Variable(tf.random_normal([n_word, emb_dim]), name='emb_w')
+            self.emb_weights = tf.Variable(tf.random_normal([n_word, emb_dim]), name='emb_w', dtype=tf.float32)
         else:
-            self.emb_weights = tf.Variable(emb_weights, name='emb_w')
+            self.emb_weights = tf.Variable(emb_weights, name='emb_w', dtype=tf.float32)
 
     def forward(self, x):
         '''

@@ -2,10 +2,11 @@ import tensorflow as tf
 import networks
 from utils import dataSet, Trainer
 import argparse
-
+import os
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--cuda', default='-1')
     parser.add_argument('--datain', nargs='?', default='interview')
     parser.add_argument('--dataout', default='interview')
     parser.add_argument('--emb_dim', type=int, default=100)
@@ -20,13 +21,15 @@ def parse_args():
     parser.add_argument('--doc_len', type=int, default=25)
     parser.add_argument('--sent_len', type=int, default=50)
     parser.add_argument('--lr', type=float, default=0.001)
-    parser.add_argument('--n_epoch', type=int, default=100)
+    parser.add_argument('--n_epoch', type=int, default=0)
     return parser.parse_args()
 
 
 if __name__ == '__main__':
     # 参数接收器
     args = parse_args()
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda
 
     # 预训练word to vector
     if args.w2v:
@@ -41,20 +44,15 @@ if __name__ == '__main__':
         word2vec.train()
 
     # 读取训练
-    word_dict, embs = dataSet.load_word_emb('./data/{}.word_emb'.format(args.dataout))
-
-    model = networks.MatchModel(
-        n_word=len(embs),
-        emb_dim=args.emb_dim,
-        doc_len=args.doc_len,
-        sent_len=args.sent_len,
-        emb_pretrain=embs
+    word_dict, embs = dataSet.load_word_emb(
+        './data/{}.word_emb'.format(args.dataout),
+        args.emb_dim
     )
 
-    dataSet.data_split(args.datain)
+    dataSet.data_split(args.datain, args.dataout, frac=0.1)
 
     train_data = dataSet.data_generator(
-        fp='./data/{}.train'.format(args.datain),
+        fp='./data/{}.train'.format(args.dataout),
         word_dict=word_dict,
         doc_len=args.doc_len,
         sent_len=args.sent_len,
@@ -62,15 +60,29 @@ if __name__ == '__main__':
     )
 
     test_data = dataSet.data_generator(
-        fp='./data/{}.test'.format(args.datain),
+        fp='./data/{}.test'.format(args.dataout),
         word_dict=word_dict,
         doc_len=args.doc_len,
         sent_len=args.sent_len,
     )
 
-    init = tf.global_variables_initializer()
-    with tf.Session() as sess:
-        sess.run(init)
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+
+    with tf.Session(
+        graph=tf.Graph(),
+        config=config
+    ) as sess:
+        model = networks.MatchModel(
+            n_word=len(embs),
+            emb_dim=args.emb_dim,
+            doc_len=args.doc_len,
+            sent_len=args.sent_len,
+            emb_pretrain=embs
+        )
+
+        writer = tf.summary.FileWriter("board", sess.graph)
+
         Trainer.train(
             sess=sess,
             model=model,
@@ -80,6 +92,12 @@ if __name__ == '__main__':
             n_epoch=args.n_epoch
         )
 
-    graph = model.predict
+        constant_graph = tf.graph_util.convert_variables_to_constants(
+            sess, sess.graph_def, ['mlp/predict'])
+
+        with tf.gfile.FastGFile('./data/' + 'model.pb', mode='wb') as f:
+            f.write(constant_graph.SerializeToString())
+
+    writer.close()
 
 

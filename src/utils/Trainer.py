@@ -24,17 +24,20 @@ def train(
         lr=0.001,
         n_epoch=100):
 
-    loss, auc = model.loss()
+    loss, auc = model.loss_function()
     optimizer = tf.train.AdamOptimizer(learning_rate=lr)
     train_op = optimizer.minimize(loss)
+    sess.run(tf.global_variables_initializer())
+    sess.run(tf.local_variables_initializer())
     for epoch in range(n_epoch):
-        fd = feed_dict(test_data, model)
-        auc_data = sess.run(auc, feed_dict=fd)
-        print('epoch: {}, auc: {}'.format(epoch, auc_data))
+        # fd = feed_dict(test_data, model)
+        # auc_data = sess.run(auc, feed_dict=fd)
+        # print('epoch: {}, auc: {}'.format(epoch, auc_data))
         for batch in tqdm(data_generator):
             fd = feed_dict(batch, model)
             sess.run(train_op, feed_dict=fd)
-        train_loss_data = sess.run(loss, feed_dict=fd)
+        train_loss_data, auc_data = sess.run([loss, auc], feed_dict=fd)
         print('epoch: {}, train loss: {}'.format(epoch, train_loss_data))
+        print('epoch: {}, auc: {}'.format(epoch, auc_data))
 
 

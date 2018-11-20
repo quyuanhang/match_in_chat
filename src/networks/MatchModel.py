@@ -21,21 +21,26 @@ class MatchModel:
         self.inf_mask = tf.placeholder(dtype=tf.float32, shape=[None, doc_len, doc_len], name='inf_mask')
         self.zero_mask = tf.placeholder(dtype=tf.float32, shape=[None, doc_len, doc_len], name='zero_mask')
         self.predict = self.forward()
+        # self.loss, self.auc, self.auc_op = self.loss_function()
 
     def forward(self):
-        jd = self.jd_cnn.forward(self.jd)
-        cv = self.cv_cnn.forward(self.cv)
-        jd, cv = self.att.forward(jd, cv, self.inf_mask, self.zero_mask)
-        score = self.mlp.forward(jd, cv)
+        with tf.name_scope('jd_cnn'):
+            jd = self.jd_cnn.forward(self.jd)
+        with tf.name_scope('cv_cnn'):
+            cv = self.cv_cnn.forward(self.cv)
+        with tf.name_scope('attention'):
+            jd, cv = self.att.forward(jd, cv, self.inf_mask, self.zero_mask)
+        with tf.name_scope('mlp'):
+            score = self.mlp.forward(jd, cv)
         return score
 
     def get_masks(self, jd_data_np, cv_data_np):
         return self.att.get_masks(jd_data_np, cv_data_np)
 
-    def loss(self):
-        label = tf.placeholder(dtype=tf.float32, shape=None, name='label')
+    def loss_function(self):
+        label = tf.placeholder(dtype=tf.int32, shape=None, name='label')
         loss = tf.losses.log_loss(label, self.predict)
-        auc = tf.metrics.auc(label, self.predict)
+        auc, _ = tf.metrics.auc(label, self.predict)
         return loss, auc
 
 
