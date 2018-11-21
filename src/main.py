@@ -20,7 +20,7 @@ def parse_args():
     # model arguments
     parser.add_argument('--doc_len', type=int, default=25)
     parser.add_argument('--sent_len', type=int, default=50)
-    parser.add_argument('--lr', type=float, default=0.001)
+    parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--n_epoch', type=int, default=0)
     return parser.parse_args()
 
@@ -64,6 +64,7 @@ if __name__ == '__main__':
         word_dict=word_dict,
         doc_len=args.doc_len,
         sent_len=args.sent_len,
+        batch_size=args.batch_size
     )
 
     config = tf.ConfigProto()
@@ -86,10 +87,11 @@ if __name__ == '__main__':
         Trainer.train(
             sess=sess,
             model=model,
-            data_generator=train_data,
-            test_data=test_data,
+            writer=writer,
+            train_generator=train_data,
+            test_generator=test_data,
             lr=args.lr,
-            n_epoch=args.n_epoch
+            n_epoch=args.n_epoch,
         )
 
         constant_graph = tf.graph_util.convert_variables_to_constants(

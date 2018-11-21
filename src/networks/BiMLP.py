@@ -1,4 +1,5 @@
 import tensorflow as tf
+from .boardUtils import vars_summaries
 
 
 class BiMLP:
@@ -8,16 +9,24 @@ class BiMLP:
             shape=[emb_dim, 2*emb_dim, 2*emb_dim]
         ), name='biW')
         self.mlp_weight = tf.Variable(tf.random_normal(
-            shape=[emb_dim, 1]
+            # =========================================================
+            # shape=[emb_dim, 1]
+            shape=[emb_dim*2, 1]
+            # =========================================================
         ), name='mlpW')
         self.mlp_bias = tf.Variable(tf.random_normal(shape=[1]), name='mlpb')
+        vars_summaries(self.bilinear_weights, self.mlp_weight, self.mlp_bias)
 
     def forward(self, jd_data, cv_data):
-        x = tf.map_fn(
-            lambda x: self.bilinear(jd_data, cv_data, x),
-            self.bilinear_weights
-        )
-        x = tf.transpose(x, perm=[1, 0])
+        # x = tf.map_fn(
+        #     lambda x: self.bilinear(jd_data, cv_data, x),
+        #     self.bilinear_weights
+        # )
+        # x = tf.transpose(x, perm=[1, 0])
+        # =============================================================
+        x = tf.concat([jd_data, cv_data], axis=1)
+        # x = tf.nn.relu(x)
+        # =============================================================
         x = tf.sigmoid(x)
         x = tf.matmul(x, self.mlp_weight)
         x = tf.add(x, self.mlp_bias)

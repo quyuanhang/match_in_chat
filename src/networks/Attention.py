@@ -29,8 +29,8 @@ class Attention:
 
     def get_inf_mask(self, jd_len, cv_len):
         inf_mask = np.zeros(shape=[self.doc_len, self.doc_len])
-        inf_mask[jd_len:] = float('-inf')
-        inf_mask[:, cv_len:] = float('-inf')
+        inf_mask[jd_len:] = -1e10
+        inf_mask[:, cv_len:] = -1e10
         return inf_mask
 
     def get_zero_mask(self, jd_len, cv_len):
@@ -45,8 +45,8 @@ class Attention:
         :param cv_data_np: same
         :return: 3d ndarray: batch * doc_len * doc_len
         """
-        jd_lens = [len(jd.any(axis=1)) for jd in jd_data_np]
-        cv_lens = [len(cv.any(axis=1)) for cv in cv_data_np]
+        jd_lens = [sum(jd.any(axis=1)) for jd in jd_data_np]
+        cv_lens = [sum(cv.any(axis=1)) for cv in cv_data_np]
         inf_masks = [self.get_inf_mask(cv_len, jd_len)
                      for cv_len, jd_len in zip(cv_lens, jd_lens)]
         inf_masks = np.array(inf_masks)
@@ -57,19 +57,24 @@ class Attention:
 
 
 if __name__ == '__main__':
-    from CNN import textCNN
+    import sys
+    sys.path.append('../')
+    from networks.CNN import TextCNN
     data1 = np.random.randint(200, size=[10, 25, 50])
     data2 = np.random.randint(200, size=[10, 25, 50])
+    for i in range(1, 10):
+        data1[i, -i:, :] = 0
+        data1[i, :, -i:] = 0
 
     X1 = tf.placeholder(dtype=tf.int32, shape=[None, 25, 50])
     X2 = tf.placeholder(dtype=tf.int32, shape=[None, 25, 50])
     INF_MASK = tf.placeholder(dtype=tf.float32, shape=[None, 25, 25])
     ZERO_MASK = tf.placeholder(dtype=tf.float32, shape=[None, 25, 25])
 
-    cnn1 = textCNN(200, 100, 25, 50)
+    cnn1 = TextCNN(200, 100, 25, 50)
     Y1 = cnn1.forward(X1)
 
-    cnn2 = textCNN(200, 100, 25, 50)
+    cnn2 = TextCNN(200, 100, 25, 50)
     Y2 = cnn2.forward(X2)
 
     attention = Attention(25)
