@@ -29,6 +29,7 @@ if __name__ == '__main__':
     # 参数接收器
     args = parse_args()
 
+    # 显卡占用
     os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda
 
     # 预训练word to vector
