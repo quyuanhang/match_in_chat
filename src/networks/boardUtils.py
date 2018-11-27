@@ -6,7 +6,7 @@ def var_summaries(var):
     """
     Attach a lot of summaries to a Tensor (for TensorBoard visualization).
     """
-    name = re.sub(':*0*', '', var.name)
+    name = re.sub(':*0*', '', var.name) + '_summary'
     with tf.name_scope(name):
         mean = tf.reduce_mean(var)
         tf.summary.scalar('mean', mean)

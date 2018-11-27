@@ -1,6 +1,8 @@
 from tqdm import tqdm
 import numpy as np
 from sklearn.model_selection import train_test_split
+import re
+import collections
 
 
 def data_generator(fp, word_dict, doc_len, sent_len, batch_size=0):
@@ -33,7 +35,7 @@ def doc_to_array(raw_str, word_dict, doc_len, sent_len):
 
 
 def sent_to_array(raw_str, word_dict, sent_len):
-    sent = [word_dict.get(x, 0) for x in raw_str.split(' ')]
+    sent = [word_dict.get(x, 1) for x in raw_str.split(' ')]
     if len(sent) < sent_len:
         sent += [0] * (sent_len - len(sent))
     else:
@@ -57,10 +59,14 @@ def load_word_emb(filename, emb_dim):
             emb = [float(x) for x in data[1:]]
             words.append(word)
             embs.append(emb)
-    word_dict = {k: v for v, k in enumerate(words, 1)}
+    word_dict = {k: v for v, k in enumerate(words, 2)}
+    word_dict['__pad__'] = 0
+    word_dict['__unk__'] = 1
     dim = len(embs[0])
     embs.insert(0, [0.0]*dim)
+    embs.insert(0, [0.0]*dim)
     embs = np.array(embs)
+    print('n_word: {}, n_emb: {}'.format(len(word_dict), len(embs)))
     return word_dict, embs
 
 
@@ -75,3 +81,19 @@ def data_split(fpin, fpout, frac):
         f.write('\n'.join(train))
     with open('./data/{}.test'.format(fpout), 'w') as f:
         f.write('\n'.join(test))
+
+
+def build_dict(fp, w_freq):
+    words = []
+    with open(fp) as f:
+        for line in tqdm(f):
+            line = re.split('[\001\n\t ]+', line.strip())
+            words.extend(line)
+    words_freq = collections.Counter(words)
+    word_dict = {k: v for k, v in words_freq.items() if v >= w_freq}
+    word_dict = {k: v for v, k in enumerate(word_dict.keys(), 2)}
+    word_dict['__pad__'] = 0
+    word_dict['__unk__'] = 1
+    print('n_words: {}'.format(len(word_dict)))
+    return word_dict
+

@@ -9,10 +9,10 @@ def feed_dict(data, model: MatchModel):
     jds, cvs, labels = data
     inf_mask, zero_mask = model.get_masks(jds, cvs)
     fd = {
-        model.jd: jds,
-        model.cv: cvs,
-        model.inf_mask: inf_mask,
-        model.zero_mask: zero_mask,
+        'jd:0': jds,
+        'cv:0': cvs,
+        'inf_mask:0': inf_mask,
+        'zero_mask:0': zero_mask,
         'label:0': labels
     }
     return fd
@@ -31,7 +31,8 @@ def train(
     predict = model.predict
     # loss, auc = model.loss_function()
     loss = model.loss_function()
-    optimizer = tf.train.AdamOptimizer(learning_rate=lr)
+    # optimizer = tf.train.AdamOptimizer(learning_rate=lr)
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr)
     train_op = optimizer.minimize(loss)
     merged = tf.summary.merge_all()
     sess.run(tf.global_variables_initializer())
