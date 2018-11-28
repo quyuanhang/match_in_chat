@@ -1,20 +1,30 @@
 import tensorflow as tf
 from tensorflow import keras
+import numpy as np
+from .boardUtils import vars_summaries
 
 
 class MatchModel:
-    def __init__(self, n_word:int, emb_dim:int, doc_len:int, sent_len:int, attention=False):
+    def __init__(self, n_word:int, emb_dim:int, doc_len:int, sent_len:int, attention=False, bil=False, reduce='mean', emb_pretrain=[]):
         self.emb_dim = emb_dim
         self.sent_len = sent_len
         self.doc_len = doc_len
         self.n_word = n_word
         self.att = attention
+        self.reduce = reduce
 
-        self.jd = tf.placeholder(dtype=tf.int32, shape=[None, doc_len, sent_len], name='jd')
-        self.cv = tf.placeholder(dtype=tf.int32, shape=[None, doc_len, sent_len], name='cv')
+        if len(emb_pretrain) > 0:
+            def myinit(*args, **kwargs):
+                return tf.convert_to_tensor(emb_pretrain, dtype=tf.float32)
+            self.emb_init = myinit
+        else:
+            self.emb_init = 'RandomNormal'
+
+        self.jd = tf.placeholder(dtype=tf.int32, shape=[None, doc_len, sent_len], name='jds')
+        self.cv = tf.placeholder(dtype=tf.int32, shape=[None, doc_len, sent_len], name='cvs')
         self.inf_masks = tf.placeholder(dtype=tf.float32, shape=[None, doc_len, doc_len], name='inf_masks')
         self.zero_masks = tf.placeholder(dtype=tf.float32, shape=[None, doc_len, doc_len], name='zero_masks')
-        self.label = tf.placeholder(dtype=tf.int32, shape=[None], name='label')
+        self.label = tf.placeholder(dtype=tf.int32, shape=[None], name='labels')
 
         with tf.variable_scope('jd_cnn'):
             jd = self.text_cnn(self.jd)
@@ -24,7 +34,10 @@ class MatchModel:
             with tf.variable_scope('attention'):
                 jd, cv = self.attention(jd, cv)
         with tf.variable_scope('classifier'):
-            self.predict = self.classifier(jd, cv)
+            if bil:
+                self.predict = self.bilinear_classifier(jd, cv)
+            else:
+                self.predict = self.classifier(jd, cv)
         with tf.variable_scope('loss'):
             self.loss = self.loss_function()
             self.auc = self.metric()
@@ -36,7 +49,7 @@ class MatchModel:
             keras.layers.Embedding(
                 input_dim=self.n_word,
                 output_dim=self.emb_dim,
-                embeddings_initializer='RandomNormal'),
+                embeddings_initializer=self.emb_init),
             keras.layers.Reshape(
                 target_shape=[self.doc_len * self.sent_len, self.emb_dim, 1]),
             keras.layers.ZeroPadding2D(
@@ -56,9 +69,12 @@ class MatchModel:
         ])
         x = layers(x)
         if self.att:
-            x = tf.reduce_mean(x, axis=2)
+            if self.reduce == 'mean':
+                x = tf.reduce_mean(x, axis=2)
+            else:
+                x = tf.reduce_max(x, axis=2)
         else:
-            x = tf.reduce_mean(x, axis=[2,3])
+            x = tf.reduce_mean(x, axis=[1, 2])
             x = tf.nn.relu(x)
         return x
 
@@ -102,54 +118,53 @@ class MatchModel:
         cv_weights = tf.multiply(tf.nn.softmax(attention_weights, axis=2), self.zero_masks)
         jd_context = tf.matmul(cv_weights, cv_data)
         jd_cat = tf.concat([jd_data, jd_context], axis=2)
-        jd_cat = tf.reduce_mean(jd_cat, reduction_indices=1)
+        if self.reduce == 'mean':
+            jd_cat = tf.reduce_mean(jd_cat, reduction_indices=1)
+        else:
+            jd_cat = tf.reduce_max(jd_cat, reduction_indices=1)
         jd_cat = tf.nn.relu(jd_cat)
 
         jd_weights = tf.multiply(tf.nn.softmax(attention_weights, axis=1), self.zero_masks)
         jd_weights = tf.transpose(jd_weights, perm=[0,2,1])
         cv_context = tf.matmul(jd_weights, jd_data)
         cv_cat = tf.concat([cv_data, cv_context], axis=2)
-        cv_cat = tf.reduce_mean(cv_cat, reduction_indices=1)
+        if self.reduce == 'mean':
+            cv_cat = tf.reduce_mean(cv_cat, reduction_indices=1)
+        else:
+            cv_cat = tf.reduce_max(cv_cat, reduction_indices=1)
         cv_cat = tf.nn.relu(cv_cat)
 
         return jd_cat, cv_cat
 
-
     def classifier(self, jd, cv):
         x = keras.layers.Concatenate()([jd, cv])
-        # x = keras.layers.Dense(self.emb_dim // 2, activation='sigmoid')(x)
-        x = keras.layers.Dense(1, activation='sigmoid')(x)
+        x = keras.layers.Dense(self.emb_dim // 2, activation='sigmoid')(x)
+        x = keras.layers.Dense(1, activation='sigmoid', name='prediction')(x)
         return x
 
-    # def bilinear(self, jd_data, cv_data, weights):
-    #     x = tf.matmul(jd_data, weights)
-    #     x = tf.multiply(x, cv_data)
-    #     x = tf.reduce_sum(x, axis=1)
-    #     return x
-    #
-    # def classifier(self, jd, cv):
-    #     bilinear_w = tf.Variable(tf.random_normal([self.emb_dim, self.emb_dim]))
-    #     x = self.bilinear(jd, cv, bilinear_w)
-    #     x = tf.nn.sigmoid(x)
-    #     return x
+    def bilinear(self, jd_data, cv_data, weights):
+        x = tf.matmul(jd_data, weights)
+        x = tf.multiply(x, cv_data)
+        x = tf.reduce_sum(x, axis=1)
+        return x
 
-    # def classifier(self, jd, cv):
-    #     emb_dim = self.emb_dim
-    #     bilinear_weights = tf.get_variable(
-    #         name='biW',
-    #         initializer=tf.random_normal(shape=[emb_dim, emb_dim, emb_dim]),
-    #     )
-    #     x = tf.map_fn(
-    #         lambda w: self.bilinear(jd, cv, w),
-    #         bilinear_weights
-    #     )
-    #     x = tf.transpose(x, perm=[1,0])
-    #     layers = keras.Sequential([
-    #         keras.layers.Activation('relu'),
-    #         keras.layers.Dense(1, activation='sigmoid')
-    #     ])
-    #     x = layers(x)
-    #     return x
+    def bilinear_classifier(self, jd, cv):
+        emb_dim = int(jd.shape[-1])
+        bilinear_weights = tf.get_variable(
+            name='biW',
+            initializer=tf.random_normal(shape=[emb_dim, emb_dim, emb_dim]),
+        )
+        x = tf.map_fn(
+            lambda w: self.bilinear(jd, cv, w),
+            bilinear_weights
+        )
+        x = tf.transpose(x, perm=[1,0])
+        layers = keras.Sequential([
+            keras.layers.Activation('relu'),
+            keras.layers.Dense(1, activation='sigmoid')
+        ])
+        x = layers(x)
+        return x
 
     def loss_function(self):
         predict = tf.squeeze(self.predict)
@@ -166,7 +181,7 @@ if __name__ == '__main__':
     import argparse
     from tqdm import tqdm
     from utils import dataSet
-    import numpy as np
+    from sklearn import metrics
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--cuda', default='-1')
@@ -213,12 +228,16 @@ if __name__ == '__main__':
     config.gpu_options.allow_growth = True
     with tf.Session(graph=tf.Graph(), config=config) as sess:
 
+        emb_pretrain = np.random.normal(size=[len(word_dict), args.emb_dim])
+        emb_pretrain[:2] = 0
+
         model = MatchModel(
             n_word=len(word_dict),
             emb_dim=args.emb_dim,
             doc_len=args.doc_len,
             sent_len=args.sent_len,
             attention=args.attention,
+            emb_pretrain=emb_pretrain,
         )
         predict = model.predict
         writer = tf.summary.FileWriter("board", sess.graph)
@@ -234,41 +253,50 @@ if __name__ == '__main__':
 
         for epoch in range(args.n_epoch):
             epoch_loss, epoch_metric = [], []
-            for batch in tqdm(train_data):
+            epoch_metric_outside = []
+            for batch in tqdm(train_data, ncols=50):
                 jds, cvs, labels = batch
                 inf_masks, zero_masks = model.get_masks(jds, cvs)
-                loss_data, auc_data, _ = sess.run(
-                    [loss, auc, train_op],
+                predict_data, loss_data, auc_data, _ = sess.run(
+                    [predict, loss, auc, train_op],
                     feed_dict={
-                        'jd:0': jds,
-                        'cv:0': cvs,
+                        'jds:0': jds,
+                        'cvs:0': cvs,
                         'inf_masks:0': inf_masks,
                         'zero_masks:0': zero_masks,
-                        'label:0': labels
+                        'labels:0': labels
                     })
                 epoch_loss.append(loss_data)
                 epoch_metric.append(auc_data)
+                outside_auc_data = metrics.roc_auc_score(labels, predict_data)
+                epoch_metric_outside.append(outside_auc_data)
             val_loss, val_metric = [], []
+            val_metric_outside = []
             for batch in test_data:
                 jds, cvs, labels = batch
                 inf_masks, zero_masks = model.get_masks(jds, cvs)
-                loss_data, auc_data = sess.run(
-                    [loss, auc],
+                predict_data, loss_data, auc_data = sess.run(
+                    [predict, loss, auc],
                     feed_dict={
-                        'jd:0': jds,
-                        'cv:0': cvs,
+                        'jds:0': jds,
+                        'cvs:0': cvs,
                         'inf_masks:0': inf_masks,
                         'zero_masks:0': zero_masks,
-                        'label:0': labels,
+                        'labels:0': labels,
                     })
                 val_loss.append(loss_data)
                 val_metric.append(auc_data)
+                outside_auc_data = metrics.roc_auc_score(labels, predict_data)
+                val_metric_outside.append(outside_auc_data)
             print(
                 'epoch: {}\n'.format(epoch),
-                'train loss: {:.3f} train metric: {:.3f}\n'.format(
+                'train loss: {:.3f} train metric: {:.3f} {:.3f}\n'.format(
                     np.array(epoch_loss).mean(),
-                    np.array(epoch_metric).mean(),),
-                'valid loss: {:.3f} valid metric: {:.3f}'.format(
+                    np.array(epoch_metric).mean(),
+                    np.array(epoch_metric_outside).mean()),
+                'valid loss: {:.3f} valid metric: {:.3f} {:.3f}\n'.format(
                     np.array(val_loss).mean(),
-                    np.array(val_metric).mean()))
+                    np.array(val_metric).mean(),
+                    np.array(val_metric_outside).mean()),
+            )
     writer.close()

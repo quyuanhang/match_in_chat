@@ -1,13 +1,14 @@
 import tensorflow as tf
-from networks import MatchModel
+from networks.Model import MatchModel
 from utils import dataSet, Trainer
 import argparse
 import os
+import numpy as np
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--cuda', default='-1')
-    parser.add_argument('--datain', nargs='?', default='interview')
+    parser.add_argument('--datain', type=str, default='')
     parser.add_argument('--dataout', default='interview')
     parser.add_argument('--emb_dim', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=128)
@@ -20,6 +21,9 @@ def parse_args():
     # model arguments
     parser.add_argument('--doc_len', type=int, default=25)
     parser.add_argument('--sent_len', type=int, default=50)
+    parser.add_argument('--attention', type=int, default=1)
+    parser.add_argument('--bil', type=int, default=1)
+    parser.add_argument('--reduce', type=str, default='mean')
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--n_epoch', type=int, default=0)
     return parser.parse_args()
@@ -44,15 +48,17 @@ if __name__ == '__main__':
     #     )
     #     word2vec.train()
 
-    # 读取训练
-    # word_dict, embs = dataSet.load_word_emb(
-    #     './data/{}.word_emb'.format(args.dataout),
-    #     args.emb_dim
-    # )
+    if args.datain:
+        dataSet.data_split(args.datain, args.dataout, frac=0.1)
 
-    dataSet.data_split(args.datain, args.dataout, frac=0.1)
+    word_dict = dataSet.build_dict(
+        'data/{}.train'.format(args.dataout), 5)
 
-    word_dict = dataSet.build_dict('data/interview.train', 5)
+    word_dict, embs = dataSet.load_word_emb(
+        './data/{}.word_emb'.format(args.dataout),
+        args.emb_dim,
+        word_dict
+    )
 
     train_data = dataSet.data_generator(
         fp='./data/{}.train'.format(args.dataout),
@@ -73,32 +79,33 @@ if __name__ == '__main__':
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
 
-    with tf.Session(
-        graph=tf.Graph(),
-        config=config
-    ) as sess:
-        model = MatchModel.MatchModel(
+    with tf.Session(graph=tf.Graph(), config=config) as sess:
+        writer = tf.summary.FileWriter("board")
+
+        model = MatchModel(
             n_word=len(word_dict),
             emb_dim=args.emb_dim,
             doc_len=args.doc_len,
             sent_len=args.sent_len,
-            # emb_pretrain=embs
+            attention=args.attention,
+            bil=args.bil,
+            reduce=args.reduce,
+            emb_pretrain=embs
         )
-
-        writer = tf.summary.FileWriter("board", sess.graph)
+        writer.add_graph(sess.graph)
 
         Trainer.train(
             sess=sess,
             model=model,
             writer=writer,
-            train_generator=train_data,
-            test_generator=test_data,
+            train_data=train_data,
+            test_data=test_data,
             lr=args.lr,
             n_epoch=args.n_epoch,
         )
 
         constant_graph = tf.graph_util.convert_variables_to_constants(
-            sess, sess.graph_def, ['mlp/predict'])
+            sess, sess.graph_def, ['classifier/prediction/Sigmoid'])
 
         with tf.gfile.FastGFile('./data/' + 'model.pb', mode='wb') as f:
             f.write(constant_graph.SerializeToString())

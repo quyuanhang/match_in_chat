@@ -43,7 +43,7 @@ def sent_to_array(raw_str, word_dict, sent_len):
     return sent
 
 
-def load_word_emb(filename, emb_dim):
+def load_word_emb(filename, emb_dim, wd={}):
     words = []
     embs = []
     start = True
@@ -56,6 +56,8 @@ def load_word_emb(filename, emb_dim):
             if len(data) != emb_dim + 1:
                 continue
             word = data[0]
+            if wd and word not in wd:
+                continue
             emb = [float(x) for x in data[1:]]
             words.append(word)
             embs.append(emb)
@@ -96,4 +98,3 @@ def build_dict(fp, w_freq):
     word_dict['__unk__'] = 1
     print('n_words: {}'.format(len(word_dict)))
     return word_dict
-
