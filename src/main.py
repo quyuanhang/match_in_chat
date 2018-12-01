@@ -18,6 +18,7 @@ def parse_args():
     parser.add_argument('--w2v_ep', type=int, default=1)
     parser.add_argument('--w2v_lr', type=int, default=0.025)
     parser.add_argument('--min_count', type=int, default=5)
+    parser.add_argument('--loademb', type=int, default=0)
     # model arguments
     parser.add_argument('--doc_len', type=int, default=25)
     parser.add_argument('--sent_len', type=int, default=50)
@@ -54,11 +55,15 @@ if __name__ == '__main__':
     word_dict = dataSet.build_dict(
         'data/{}.train'.format(args.dataout), 5)
 
-    word_dict, embs = dataSet.load_word_emb(
-        './data/{}.word_emb'.format(args.dataout),
-        args.emb_dim,
-        word_dict
-    )
+    if args.loademb:
+        word_dict, embs = dataSet.load_word_emb(
+            './data/{}.word_emb'.format(args.dataout),
+            args.emb_dim,
+            word_dict
+        )
+    else:
+        embs = np.random.normal(size=[len(word_dict), args.emb_dim])
+        embs[:2] = 0
 
     train_data = dataSet.data_generator(
         fp='./data/{}.train'.format(args.dataout),

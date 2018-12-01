@@ -27,13 +27,19 @@ if __name__ == '__main__':
     train_neg = load_data('../Data/interview_split/train/interview_split.negative', '0')
     train_posi = load_data('../Data/interview_split/train/interview_split.positive', '1')
     train = shuffle(train_neg + train_posi)
+    print('num of train data', len(train))
 
-    test_neg = load_data('../Data/interview_split/test/interview_split.negative', '0')
-    test_posi = load_data('../Data/interview_split/test/interview_split.positive', '1')
+    # test_neg = load_data('../Data/interview_split/test/interview_split.negative', '0')
+    # test_posi = load_data('../Data/interview_split/test/interview_split.positive', '1')
+    test_neg = load_data('../Data/add/add.negative', '0')
+    test_posi = load_data('../Data/add/add.positive', '1')
     test = shuffle(test_neg + test_posi)
+    print('num of test data', len(test))
 
     train_pair = set([(d[0], d[3]) for d in train])
     test = [d for d in test if (d[0], d[3]) not in train_pair]
+    print('num of distinct train', len(train_pair))
+    print('num of clean test', len(test))
 
     save_data('data/interview.train', train)
     save_data('data/interview.test', test)

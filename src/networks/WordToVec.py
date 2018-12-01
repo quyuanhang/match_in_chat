@@ -288,7 +288,7 @@ def parse_args():
     parser.add_argument('--emb_dimension', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--window_size', type=int, default=5)
-    parser.add_argument('--iteration', type=int, default=3)
+    parser.add_argument('--iteration', type=int, default=5)
     parser.add_argument('--initial_lr', type=int, default=0.025)
     parser.add_argument('--min_count', type=int, default=5)
     return parser.parse_args()
@@ -301,6 +301,7 @@ if __name__ == '__main__':
         input_file_name=args.datain,
         output_file_name=args.dataout,
         emb_dimension=args.emb_dimension,
-        iteration=args.iteration
+        iteration=args.iteration,
+        batch_size=args.batch_size,
     )
     w2v.train()

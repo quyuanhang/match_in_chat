@@ -56,6 +56,7 @@ class MatchModel:
                 padding=(2, 0)),
             keras.layers.Conv2D(
                 filters=self.emb_dim,
+                # kernel_regularizer=keras.regularizers.l2(0.0001),
                 kernel_size=[5, self.emb_dim]),
             keras.layers.Permute(
                 dims=[1, 3, 2]),
@@ -63,6 +64,8 @@ class MatchModel:
                 padding=(1, 0)),
             keras.layers.Conv2D(
                 filters=self.emb_dim,
+                # kernel_regularizer=keras.regularizers.l1_l2(),
+                # kernel_regularizer=keras.regularizers.l2(0.0001),
                 kernel_size=[3, self.emb_dim]),
             keras.layers.Reshape(
                 target_shape=[self.doc_len, self.sent_len, self.emb_dim]),
@@ -138,8 +141,18 @@ class MatchModel:
 
     def classifier(self, jd, cv):
         x = keras.layers.Concatenate()([jd, cv])
-        x = keras.layers.Dense(self.emb_dim // 2, activation='sigmoid')(x)
-        x = keras.layers.Dense(1, activation='sigmoid', name='prediction')(x)
+        # x = keras.layers.Dense(
+        #     self.emb_dim // 2,
+        #     activation='sigmoid',
+        #     kernel_regularizer=keras.regularizers.l1_l2(),
+        # )(x)
+        x = keras.layers.Dense(
+            1,
+            activation='sigmoid',
+            name='prediction',
+            # kernel_regularizer=keras.regularizers.l1_l2(),
+            # kernel_regularizer=keras.regularizers.l2(0.0001),
+        )(x)
         return x
 
     def bilinear(self, jd_data, cv_data, weights):
